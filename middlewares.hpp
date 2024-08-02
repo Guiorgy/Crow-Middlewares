@@ -35,7 +35,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <cassert>
 
-namespace {
+namespace remote_ip_guard_detail {
 #if __cplusplus >= 202002L
     template<typename T>
     struct empty_type_template {
@@ -149,24 +149,22 @@ namespace {
     constexpr inline bool is_valid_ip(const char* ip) noexcept {
         return is_valid_ips(ip, false);
     }
-} // namespace
 
-namespace crow {
-    template<const char* allowed_ips, std::enable_if_t<is_valid_ips(allowed_ips), bool> = true>
+    template<const char* ip_list, const bool whitelist = true, std::enable_if_t<is_valid_ips(ip_list), bool> = true>
     class RemoteIpGuard {
         using self_t = RemoteIpGuard;
 
-        std::set<std::string> allowed_ip_set;
+        std::set<std::string> ip_set;
 
-        using current_frozen_t = std::conditional_t<is_empty(allowed_ips), bool, empty_type>;
+        using current_frozen_t = std::conditional_t<is_empty(ip_list), bool, empty_type>;
         [[no_unique_address]] current_frozen_t frozen = current_frozen_t();
 
     public:
         RemoteIpGuard() {
-            parse_allowed_ips_template_arg();
+            parse_ip_list_template_arg();
 
-            if (allowed_ip_set.size() != 0) {
-                CROW_LOG_DEBUG << "Allowed IPs: " << get_allowed_ips_list();
+            if (ip_set.size() != 0) {
+                CROW_LOG_DEBUG << "RemoteIpGuard IPs: " << get_ip_list_str();
             }
         }
 
@@ -174,7 +172,7 @@ namespace crow {
 
         void before_handle(crow::request& req, crow::response& res, context& ctx) const {
             if (!is_ip_allowed(req.remote_ip_address)) {
-                CROW_LOG_DEBUG << "Unauthorized access attempt from IP " << req.remote_ip_address << ": [" << method_strings[(unsigned char)req.method] << "] " << req.url << " [Result: 403 Forbidden]";
+                CROW_LOG_DEBUG << "Unauthorized access attempt from IP " << req.remote_ip_address << ": [" << crow::method_strings[(unsigned char)req.method] << "] " << req.url << " [Result: 403 Forbidden]";
 
                 res.code = crow::status::FORBIDDEN;
                 res.end();
@@ -184,13 +182,13 @@ namespace crow {
         void after_handle(crow::request& req, crow::response& res, context& ctx) const {}
 
     private:
-        // Assumes that the allowed_ips string is in a valid format, in other words, it's been validated using the is_valid_ips function
-        void parse_allowed_ips_template_arg() {
-            assert(allowed_ip_set.size() == 0);
+        // Assumes that the ip_list string is in a valid format, in other words, it's been validated using the is_valid_ips function
+        void parse_ip_list_template_arg() {
+            assert(ip_set.size() == 0);
 
-            if (is_empty(allowed_ips)) return;
+            if (is_empty(ip_list)) return;
 
-            const char* aip = allowed_ips;
+            const char* aip = ip_list;
 
             char ip_buffer[16] = {0};
             int ip_len = 0;
@@ -222,7 +220,7 @@ namespace crow {
                         assert(dots == 3 && subnet_len != 0);
 
                         ip_buffer[ip_len] = '\0';
-                        allowed_ip_set.emplace(std::string(ip_buffer));
+                        ip_set.emplace(std::string(ip_buffer));
 
                         subnet_len = 0;
                         dots = 0;
@@ -248,17 +246,17 @@ namespace crow {
             assert(dots == 3 && subnet_len != 0);
 
             ip_buffer[ip_len] = '\0';
-            allowed_ip_set.emplace(std::string(ip_buffer));
+            ip_set.emplace(std::string(ip_buffer));
         }
 
-        std::string get_allowed_ips_list() const noexcept {
+        std::string get_ip_list_str() const noexcept {
             const size_t ip_max_size = 15;
 
             std::string str;
-            str.reserve((ip_max_size + 2 /* accounting for the comma+space separation */) * allowed_ip_set.size());
+            str.reserve((ip_max_size + 2 /* accounting for the comma+space separation */) * ip_set.size());
 
-            std::set<std::string>::iterator it = allowed_ip_set.begin();
-            for (size_t i = allowed_ip_set.size(); i > 1; i--) {
+            std::set<std::string>::iterator it = ip_set.begin();
+            for (size_t i = ip_set.size(); i > 1; i--) {
                 str.append(*it);
                 str.append(", ");
                 ++it;
@@ -267,72 +265,100 @@ namespace crow {
 
             return str;
         }
+
+        inline void log_ip_list_already_frozen() const noexcept {
+            CROW_LOG_WARNING << "RemoteIpGuard IP list is already frozen";
+        }
+
+        inline void log_ip_is_not_valid(const std::string ip) const noexcept {
+            CROW_LOG_WARNING << "IP '" << ip << "' is not valid";
+        }
     public:
-        inline bool is_ip_allowed(std::string ip) const noexcept {
-            return allowed_ip_set.find(ip) != allowed_ip_set.end();
+        inline bool is_ip_allowed(const std::string ip) const noexcept {
+            const bool ip_set_contains = ip_set.find(ip) != ip_set.end();
+
+            if constexpr (whitelist) {
+                return ip_set_contains;
+            } else {
+                return !ip_set_contains;
+            }
         }
 
-        template<const char* _allowed_ips = allowed_ips>
-        typename std::enable_if<is_empty(_allowed_ips), self_t&>::type add_ip(const std::string ip) {
+        inline bool is_ip_forbidden(const std::string ip) const noexcept {
+            return !is_ip_allowed(ip);
+        }
+
+        template<const char* _ip_list = ip_list>
+        typename std::enable_if<is_empty(_ip_list), self_t&>::type add_ip(const std::string ip) {
             assert(!frozen && is_valid_ip(ip.c_str()));
 
             if (frozen) {
-                CROW_LOG_WARNING << "Allowed IP list is already frozen";
+                log_ip_list_already_frozen();
                 return *this;
             }
             if (!is_valid_ip(ip.c_str())) {
-                CROW_LOG_WARNING << "IP '" << ip << "' is not valid";
+                log_ip_is_not_valid(ip);
                 return *this;
             }
 
-            CROW_LOG_DEBUG << "Adding allowed IP: " << ip;
+            CROW_LOG_DEBUG << "Adding RemoteIpGuard IP: " << ip;
 
-            allowed_ip_set.emplace(ip);
+            ip_set.emplace(ip);
 
             return *this;
         }
 
-        template<const char* _allowed_ips = allowed_ips>
-        typename std::enable_if<is_empty(_allowed_ips), self_t&>::type remove_ip(const std::string ip) {
+        template<const char* _ip_list = ip_list>
+        typename std::enable_if<is_empty(_ip_list), self_t&>::type remove_ip(const std::string ip) {
             assert(!frozen && is_valid_ip(ip.c_str()));
 
             if (frozen) {
-                CROW_LOG_WARNING << "Allowed IP list is already frozen";
+                log_ip_list_already_frozen();
                 return *this;
             }
             if (!is_valid_ip(ip.c_str())) {
-                CROW_LOG_WARNING << "IP '" << ip << "' is not valid";
+                log_ip_is_not_valid(ip);
                 return *this;
             }
 
-            CROW_LOG_DEBUG << "Removing allowed IP: " << ip;
+            CROW_LOG_DEBUG << "Removing RemoteIpGuard IP: " << ip;
 
-            allowed_ip_set.erase(ip);
+            ip_set.erase(ip);
 
             return *this;
         }
 
-        template<const char* _allowed_ips = allowed_ips>
-        typename std::enable_if<is_empty(_allowed_ips), self_t&>::type freeze() {
+        template<const char* _ip_list = ip_list>
+        typename std::enable_if<is_empty(_ip_list), bool>::type is_frozen() {
+            return frozen;
+        }
+
+        template<const char* _ip_list = ip_list>
+        typename std::enable_if<is_empty(_ip_list), self_t&>::type freeze() {
             assert(!frozen);
 
             if (frozen) {
-                CROW_LOG_WARNING << "Allowed IP list is already frozen";
+                log_ip_list_already_frozen();
                 return *this;
             }
 
-            CROW_LOG_DEBUG << "Freezing " << allowed_ip_set.size() << " allowed IPs: " << get_allowed_ips_list();
+            CROW_LOG_DEBUG << "Freezing " << ip_set.size() << " RemoteIpGuard IPs: " << get_ip_list_str();
 
             frozen = true;
 
             return *this;
         }
-
-        template<const char* _allowed_ips = allowed_ips>
-        typename std::enable_if<is_empty(_allowed_ips), bool>::type is_frozen() {
-            return frozen;
-        }
     };
+} // namespace remote_ip_guard_detail
 
-    using DynamicIpGuard = RemoteIpGuard<nullptr>;
+namespace crow {
+    template<const char* allowed_ip_list>
+    using WhitelistIpGuard = remote_ip_guard_detail::RemoteIpGuard<allowed_ip_list>;
+
+    using DynamicWhitelistIpGuard = remote_ip_guard_detail::RemoteIpGuard<nullptr>;
+
+    template<const char* forbidden_ip_list>
+    using BlacklistIpGuard = remote_ip_guard_detail::RemoteIpGuard<forbidden_ip_list, false>;
+
+    using DynamicBlacklistIpGuard = remote_ip_guard_detail::RemoteIpGuard<nullptr, false>;
 } // namespace crow
