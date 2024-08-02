@@ -250,6 +250,8 @@ namespace remote_ip_guard_detail {
         }
 
         std::string get_ip_list_str() const noexcept {
+            if (ip_set.size() == 0) return "";
+
             const size_t ip_max_size = 15;
 
             std::string str;
