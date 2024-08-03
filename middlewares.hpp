@@ -115,7 +115,7 @@ namespace remote_ip_guard_detail {
 
                     break;
                 case ',':
-                    if (dots != 3 || subnet_len == 0) return false;
+                    if (!can_be_list || dots != 3 || subnet_len == 0) return false;
 
                     subnet[subnet_len] = '\0';
                     if (!is_valid_subnet(subnet)) return false;
