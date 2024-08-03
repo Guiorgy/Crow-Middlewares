@@ -159,16 +159,15 @@ namespace remote_ip_guard_detail {
     class RemoteIpGuard {
         using self_t = RemoteIpGuard;
 
-        std::unordered_set<std::string> ip_set;
+        using current_ip_set_t = std::conditional_t<is_empty(ip_list), std::unordered_set<std::string>, const std::unordered_set<std::string>>;
+        current_ip_set_t ip_set = parse_ip_list_template_arg();
 
         using current_frozen_t = std::conditional_t<is_empty(ip_list), bool, empty_type>;
         [[no_unique_address]] current_frozen_t frozen = current_frozen_t();
 
     public:
         RemoteIpGuard() {
-            parse_ip_list_template_arg();
-
-            if (ip_set.size() != 0) {
+            if constexpr (!is_empty(ip_list)) {
                 CROW_LOG_DEBUG << "RemoteIpGuard IPs: " << get_ip_list_str();
             }
         }
@@ -188,10 +187,10 @@ namespace remote_ip_guard_detail {
 
     private:
         // Assumes that the ip_list string is in a valid format, in other words, it's been validated using the is_valid_ips function
-        void parse_ip_list_template_arg() {
-            assert(ip_set.size() == 0);
+        constexpr std::unordered_set<std::string> parse_ip_list_template_arg() {
+            if (is_empty(ip_list)) return {};
 
-            if (is_empty(ip_list)) return;
+            std::unordered_set<std::string> _ip_set;
 
             const char* aip = ip_list;
 
@@ -225,7 +224,7 @@ namespace remote_ip_guard_detail {
                         assert(dots == 3 && subnet_len != 0);
 
                         ip_buffer[ip_len] = '\0';
-                        ip_set.emplace(std::string(ip_buffer));
+                        _ip_set.emplace(std::string(ip_buffer));
 
                         subnet_len = 0;
                         dots = 0;
@@ -251,7 +250,9 @@ namespace remote_ip_guard_detail {
             assert(dots == 3 && subnet_len != 0);
 
             ip_buffer[ip_len] = '\0';
-            ip_set.emplace(std::string(ip_buffer));
+            _ip_set.emplace(std::string(ip_buffer));
+
+            return _ip_set;
         }
 
         std::string get_ip_list_str() const noexcept {
