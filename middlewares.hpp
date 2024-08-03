@@ -40,7 +40,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cassert>
 #include <set>
 
-namespace remote_ip_guard_detail {
+namespace crow_middlewares_detail {
 #if __cplusplus >= 202002L
     template<typename T>
     struct empty_type_template {
@@ -154,6 +154,10 @@ namespace remote_ip_guard_detail {
     constexpr inline bool is_valid_ip(const char* ip) noexcept {
         return is_valid_ips(ip, false);
     }
+} // namespace crow_middlewares_detail
+
+namespace remote_ip_guard_detail {
+    using namespace crow_middlewares_detail;
 
     template<const char* ip_list, const bool whitelist = true, std::enable_if_t<is_valid_ips(ip_list), bool> = true>
     class RemoteIpGuard {
