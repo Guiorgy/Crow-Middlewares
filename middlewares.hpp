@@ -423,6 +423,25 @@ namespace remote_ip_guard_detail {
             return str;
         }
 
+        std::string get_ip_list_str(const std::vector<std::string>& ips) const noexcept {
+            if (ips.size() == 0) return "";
+
+            const size_t ip_max_size = 15;
+
+            std::string str;
+            str.reserve((ip_max_size + 2 /* accounting for the comma+space separation */) * ips.size());
+
+            auto it = ips.begin();
+            for (size_t i = ips.size(); i > 1; i--) {
+                str.append(*it);
+                str.append(", ");
+                ++it;
+            }
+            str.append(*it);
+
+            return str;
+        }
+
         inline void log_ip_list_already_frozen() const noexcept {
             CROW_LOG_WARNING << "IP " << ip_list_type_str() << " is already frozen";
         }
@@ -469,6 +488,72 @@ namespace remote_ip_guard_detail {
             CROW_LOG_INFO << "Adding IP to the " << ip_list_type_str() << ": " << ip;
 
             insert_into_sorted_vector(ip_set, ipv4);
+
+            return *this;
+        }
+
+        template<const char* _ip_list = ip_list>
+        typename std::enable_if<is_empty(_ip_list), self_t&>::type add_ips(const std::vector<std::string>& ips) {
+            assert(!frozen);
+
+            if (frozen) {
+                log_ip_list_already_frozen();
+                return *this;
+            }
+
+            if (ips.size() == 0) return *this;
+
+            std::vector<int32_t> parsed;
+            parsed.reserve(ips.size());
+            for (auto it = ips.begin(); it != ips.end(); ++it) {
+                int32_t ipv4 = 0;
+                if (inet_pton(AF_INET, it->c_str(), &ipv4) != 1) {
+                    log_ip_is_not_valid(*it);
+                    return *this;
+                }
+
+                parsed.push_back(ipv4);
+            }
+            std::sort(parsed.begin(), parsed.end());
+            parsed.erase(std::unique(parsed.begin(), parsed.end()), parsed.end());
+
+            CROW_LOG_INFO << "Adding IPs to the " << ip_list_type_str() << ": " << get_ip_list_str(ips);
+
+            if (ip_set.size() == 0) {
+                // Swap ip_set with the temporary vector containing unique parsed sorted input ips
+
+                ip_set.swap(parsed);
+            } else {
+                // Merge the temporary vector containing unique parsed sorted input ips and ip_set into another temporary vector while skipping duplicates and then swap that container with ip_set
+
+                std::vector<int32_t> merged;
+                merged.reserve(ip_set.size() + parsed.size());
+
+                auto ip_set_it = ip_set.begin();
+                auto ips_it = parsed.begin();
+
+                while (ip_set_it != ip_set.end() && ips_it != parsed.end()) {
+                    if (*ip_set_it < *ips_it) {
+                        merged.push_back(*ip_set_it);
+                        ++ip_set_it;
+                    } else if (*ip_set_it > *ips_it) {
+                        merged.push_back(*ips_it);
+                        ++ips_it;
+                    } else {
+                        ++ips_it;
+                    }
+                }
+
+                for (; ip_set_it != ip_set.end(); ++ip_set_it) {
+                    merged.push_back(*ip_set_it);
+                }
+
+                for (; ips_it != parsed.end(); ++ips_it) {
+                    merged.push_back(*ips_it);
+                }
+
+                ip_set.swap(merged);
+            }
 
             return *this;
         }
