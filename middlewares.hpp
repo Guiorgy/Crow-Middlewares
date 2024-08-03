@@ -342,7 +342,12 @@ namespace remote_ip_guard_detail {
             }
         }
 
-        void after_handle(crow::request& req, crow::response& res, context& ctx) const {}
+        void after_handle(crow::request& req, crow::response& res, context& ctx) {
+            if constexpr (is_empty(ip_list)) {
+                // Modifications during runtime may invalidate iterators that are being used for allowing/denying requests
+                if (!frozen) freeze();
+            }
+        }
 
     private:
         // Assumes that the ip_list string is in a valid format, in other words, it's been validated using the is_valid_ips function
