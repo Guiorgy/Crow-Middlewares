@@ -496,6 +496,24 @@ namespace remote_ip_guard_detail {
         }
 
         template<const char* _ip_list = ip_list>
+        typename std::enable_if<is_empty(_ip_list), self_t&>::type clear_ips() {
+            assert(!frozen);
+
+            if (frozen) {
+                log_ip_list_already_frozen();
+                return *this;
+            }
+
+            if (ip_set.size() == 0) return *this;
+
+            CROW_LOG_INFO << "Removing all IPs from the " << ip_list_type_str();
+
+            ip_set.clear();
+
+            return *this;
+        }
+
+        template<const char* _ip_list = ip_list>
         typename std::enable_if<is_empty(_ip_list), bool>::type is_frozen() {
             return frozen;
         }
