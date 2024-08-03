@@ -154,7 +154,7 @@ namespace remote_ip_guard_detail {
     class RemoteIpGuard {
         using self_t = RemoteIpGuard;
 
-        std::set<std::string> ip_set;
+        std::unordered_set<std::string> ip_set;
 
         using current_frozen_t = std::conditional_t<is_empty(ip_list), bool, empty_type>;
         [[no_unique_address]] current_frozen_t frozen = current_frozen_t();
@@ -257,7 +257,7 @@ namespace remote_ip_guard_detail {
             std::string str;
             str.reserve((ip_max_size + 2 /* accounting for the comma+space separation */) * ip_set.size());
 
-            std::set<std::string>::iterator it = ip_set.begin();
+            auto it = ip_set.begin();
             for (size_t i = ip_set.size(); i > 1; i--) {
                 str.append(*it);
                 str.append(", ");
