@@ -308,6 +308,22 @@ namespace remote_ip_guard_detail {
             }
         }
 
+        constexpr std::string ip_list_type_action_str() const noexcept {
+            if constexpr (whitelist) {
+                return "allow";
+            } else {
+                return "block";
+            }
+        }
+
+        constexpr std::string ip_list_type_negative_action_str() const noexcept {
+            if constexpr (whitelist) {
+                return "block";
+            } else {
+                return "allow";
+            }
+        }
+
     public:
         RemoteIpGuard() {
             if constexpr (!is_empty(ip_list)) {
@@ -613,6 +629,10 @@ namespace remote_ip_guard_detail {
             }
 
             CROW_LOG_INFO << "Freezing the " << ip_list_type_str() << " with " << ip_set.size() << " IPs: " << get_ip_list_str();
+
+            if (ip_set.size() == 0) {
+                CROW_LOG_WARNING << "Freezing an empty " << ip_list_type_str() << "! All incoming traffic will be " << ip_list_type_negative_action_str() << "ed!";
+            }
 
             frozen = true;
             ip_set.shrink_to_fit();
