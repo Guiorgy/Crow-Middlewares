@@ -172,7 +172,7 @@ namespace crow_middlewares_detail {
     }
 
     constexpr bool is_valid_ips(const char* ips, const bool can_be_list = true) noexcept {
-        if (is_empty(ips)) return true;
+        if (is_empty(ips)) return can_be_list;
 
         int ip_len = 0;
         char subnet[4] = {'0'}; subnet[3] = '\0';
