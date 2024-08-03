@@ -121,6 +121,7 @@ namespace crow_middlewares_detail {
                     if (!is_valid_subnet(subnet)) return false;
 
                     subnet_len = 0;
+                    leading_zero = false;
                     dots = 0;
                     ip_len = 0;
 
@@ -132,6 +133,7 @@ namespace crow_middlewares_detail {
                     if (!is_valid_subnet(subnet)) return false;
 
                     subnet_len = 0;
+                    leading_zero = false;
                     dots++;
                     ip_len++;
 
