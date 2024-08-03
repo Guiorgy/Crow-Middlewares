@@ -300,10 +300,18 @@ namespace remote_ip_guard_detail {
         using current_frozen_t = std::conditional_t<is_empty(ip_list), bool, empty_type>;
         [[no_unique_address]] current_frozen_t frozen = current_frozen_t();
 
+        constexpr std::string ip_list_type_str() const noexcept {
+            if constexpr (whitelist) {
+                return "whitelist";
+            } else {
+                return "blacklis";
+            }
+        }
+
     public:
         RemoteIpGuard() {
             if constexpr (!is_empty(ip_list)) {
-                CROW_LOG_DEBUG << "RemoteIpGuard IPs: " << get_ip_list_str();
+                CROW_LOG_INFO << "Initialized the " << ip_list_type_str() << " with " << ip_set.size() << " IPs: " << get_ip_list_str();
             }
         }
 
@@ -311,7 +319,7 @@ namespace remote_ip_guard_detail {
 
         void before_handle(crow::request& req, crow::response& res, context& ctx) const {
             if (!is_ip_allowed(req.remote_ip_address)) {
-                CROW_LOG_DEBUG << "Unauthorized access attempt from IP " << req.remote_ip_address << ": [" << crow::method_strings[(unsigned char)req.method] << "] " << req.url << " [Result: 403 Forbidden]";
+                CROW_LOG_INFO << "Unauthorized access attempt from IP " << req.remote_ip_address << ": [" << crow::method_strings[(unsigned char)req.method] << "] " << req.url << " [Result: 403 Forbidden]";
 
                 res.code = crow::status::FORBIDDEN;
                 res.end();
@@ -416,7 +424,7 @@ namespace remote_ip_guard_detail {
         }
 
         inline void log_ip_list_already_frozen() const noexcept {
-            CROW_LOG_WARNING << "RemoteIpGuard IP list is already frozen";
+            CROW_LOG_WARNING << "IP " << ip_list_type_str() << " is already frozen";
         }
 
         inline void log_ip_is_not_valid(const std::string ip) const noexcept {
@@ -458,7 +466,7 @@ namespace remote_ip_guard_detail {
                 return *this;
             }
 
-            CROW_LOG_DEBUG << "Adding RemoteIpGuard IP: " << ip;
+            CROW_LOG_INFO << "Adding IP to the " << ip_list_type_str() << ": " << ip;
 
             insert_into_sorted_vector(ip_set, ipv4);
 
@@ -480,7 +488,7 @@ namespace remote_ip_guard_detail {
                 return *this;
             }
 
-            CROW_LOG_DEBUG << "Removing RemoteIpGuard IP: " << ip;
+            CROW_LOG_INFO << "Removing IP from the " << ip_list_type_str() << ": " << ip;
 
             erase_from_sorted_vector(ip_set, ipv4);
 
@@ -501,7 +509,7 @@ namespace remote_ip_guard_detail {
                 return *this;
             }
 
-            CROW_LOG_DEBUG << "Freezing " << ip_set.size() << " RemoteIpGuard IPs: " << get_ip_list_str();
+            CROW_LOG_INFO << "Freezing the " << ip_list_type_str() << " with " << ip_set.size() << " IPs: " << get_ip_list_str();
 
             frozen = true;
             ip_set.shrink_to_fit();
