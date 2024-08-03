@@ -33,7 +33,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#include "crow.h"
+//#include "crow_all.h"
+
+#include <type_traits>
 #include <cassert>
+#include <set>
 
 namespace remote_ip_guard_detail {
 #if __cplusplus >= 202002L
