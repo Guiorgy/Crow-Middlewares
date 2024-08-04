@@ -141,13 +141,13 @@ namespace crow_middlewares_detail {
         constexpr empty_type() {}
 
         template<typename T>
-        constexpr empty_type(T _) {}
+        constexpr empty_type([[maybe_unused]] T _) {}
 
         template<typename T1, typename T2>
-        constexpr empty_type(T1 _, T2 __) {}
+        constexpr empty_type([[maybe_unused]] T1 _, [[maybe_unused]] T2 __) {}
 
         template<typename T1, typename T2, typename T3>
-        constexpr empty_type(T1 _, T2 __, T2 ___) {}
+        constexpr empty_type([[maybe_unused]] T1 _, [[maybe_unused]] T2 __, [[maybe_unused]] T2 ___) {}
     };
 #endif // __cplusplus >= 202002L
 
@@ -334,7 +334,7 @@ namespace remote_ip_guard_detail {
 
         struct context {};
 
-        void before_handle(crow::request& req, crow::response& res, context& ctx) const {
+        void before_handle([[maybe_unused]] crow::request& req, [[maybe_unused]] crow::response& res, [[maybe_unused]] context& ctx) const {
             if (!is_ip_allowed(req.remote_ip_address)) {
                 CROW_LOG_INFO << "Unauthorized access attempt from IP " << req.remote_ip_address << ": [" << crow::method_strings[(unsigned char)req.method] << "] " << req.url << " [Result: 403 Forbidden]";
 
@@ -343,7 +343,7 @@ namespace remote_ip_guard_detail {
             }
         }
 
-        void after_handle(crow::request& req, crow::response& res, context& ctx) {
+        void after_handle([[maybe_unused]] crow::request& req, [[maybe_unused]] crow::response& res, [[maybe_unused]] context& ctx) {
             if constexpr (!frozen_ips) {
                 // Modifications during runtime may invalidate iterators that are being used for allowing/denying requests
                 if (!frozen) freeze();
