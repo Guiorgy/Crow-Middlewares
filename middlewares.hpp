@@ -147,7 +147,7 @@ namespace crow_middlewares_detail {
         constexpr empty_type([[maybe_unused]] T1 _, [[maybe_unused]] T2 __) {}
 
         template<typename T1, typename T2, typename T3>
-        constexpr empty_type([[maybe_unused]] T1 _, [[maybe_unused]] T2 __, [[maybe_unused]] T2 ___) {}
+        constexpr empty_type([[maybe_unused]] T1 _, [[maybe_unused]] T2 __, [[maybe_unused]] T3 ___) {}
     };
 #endif // __cplusplus >= 202002L
 
