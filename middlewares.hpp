@@ -291,7 +291,7 @@ namespace crow_middlewares_detail {
 namespace remote_ip_guard_detail {
     using namespace crow_middlewares_detail;
 
-    template<const char* ip_list, const bool whitelist, const bool frozen_ips, std::enable_if_t<is_valid_ips(ip_list, !frozen_ips), bool> = true>
+    template<const char* ip_list, const bool whitelist, const bool frozen_ips>
     class RemoteIpGuard {
         using self_t = RemoteIpGuard;
 
@@ -327,6 +327,8 @@ namespace remote_ip_guard_detail {
 
     public:
         RemoteIpGuard() {
+            static_assert(is_valid_ips(ip_list, !frozen_ips), "The template argument ip_list is not valid");
+
             if constexpr (!is_empty(ip_list)) {
                 CROW_LOG_INFO << "Initialized the " << ip_list_type_str() << " with " << ip_set.size() << " IPs: " << get_ip_list_str();
             }
