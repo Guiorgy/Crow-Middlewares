@@ -354,7 +354,7 @@ namespace remote_ip_guard_detail {
 
     private:
         // Assumes that the ip_list string is in a valid format, in other words, it's been validated using the is_valid_ips function
-        constexpr std::vector<int32_t> parse_ip_list_template_arg() {
+        constexpr std::vector<int32_t> parse_ip_list_template_arg() const {
             if (is_empty(ip_list)) return {};
 
             std::vector<int32_t> _ip_set;
