@@ -510,6 +510,7 @@ namespace remote_ip_guard_detail {
         template<typename T>
         inline bool is_ip_allowed(const T& ip) const noexcept {
             static_assert(std::is_same_v<T, int32_t> || std::is_same_v<T, std::string>);
+            assert(is_valid_ip(ip.c_str()));
 
             int32_t ipv4 = 0;
             if constexpr (std::is_same_v<T, int32_t>) {
