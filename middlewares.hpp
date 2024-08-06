@@ -576,7 +576,7 @@ namespace remote_ip_guard_detail {
             std::sort(parsed.begin(), parsed.end());
             parsed.erase(std::unique(parsed.begin(), parsed.end()), parsed.end());
 
-            CROW_LOG_INFO << "Adding IPs to the " << ip_list_type_str() << ": " << get_ip_list_str(ips);
+            CROW_LOG_INFO << "Adding IPs to the " << ip_list_type_str() << ": " << get_ip_list_str(parsed);
 
             if (ip_set.size() == 0) {
                 // Swap ip_set with the temporary vector containing unique parsed sorted input ips
