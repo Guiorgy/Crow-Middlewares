@@ -428,42 +428,42 @@ namespace remote_ip_guard_detail {
             return _ip_set;
         }
 
-        std::string get_ip_list_str() const noexcept {
-            if (ip_set.size() == 0) return "";
+        template<typename T>
+        constexpr std::string to_ipv4_string(const T& ip) const noexcept {
+            static_assert(std::is_same_v<T, int32_t> || std::is_same_v<T, std::string>);
 
-            const size_t ip_max_size = 15;
+            if constexpr (std::is_same_v<T, int32_t>) {
+                return int_to_ipv4_string(ip);
+            } else {
+                return ip;
+            }
+        }
+
+        template<typename T>
+        std::string get_ip_list_str(const std::vector<T>& ips) const noexcept {
+            static_assert(std::is_same_v<T, int32_t> || std::is_same_v<T, std::string>);
+
+            if (ips.size() == 0) return "";
 
             std::string str;
-            str.reserve((ip_max_size + 2 /* accounting for the comma+space separation */) * ip_set.size());
 
-            auto it = ip_set.begin();
-            for (size_t i = ip_set.size(); i > 1; i--) {
-                str.append(int_to_ipv4_string(*it));
+            const size_t ip_max_size = 15; // ***.***.***.***
+            const size_t ip_list_separator = 2; // comma + space
+            str.reserve((ip_max_size + ip_list_separator) * ips.size());
+
+            auto it = ips.begin();
+            for (size_t i = ips.size(); i > 1; i--) {
+                str.append(to_ipv4_string(*it));
                 str.append(", ");
                 ++it;
             }
-            str.append(int_to_ipv4_string(*it));
+            str.append(to_ipv4_string(*it));
 
             return str;
         }
 
-        std::string get_ip_list_str(const std::vector<std::string>& ips) const noexcept {
-            if (ips.size() == 0) return "";
-
-            const size_t ip_max_size = 15;
-
-            std::string str;
-            str.reserve((ip_max_size + 2 /* accounting for the comma+space separation */) * ips.size());
-
-            auto it = ips.begin();
-            for (size_t i = ips.size(); i > 1; i--) {
-                str.append(*it);
-                str.append(", ");
-                ++it;
-            }
-            str.append(*it);
-
-            return str;
+        std::string get_ip_list_str() const noexcept {
+            return get_ip_list_str(ip_set);
         }
 
         inline void log_ip_list_already_frozen() const noexcept {
