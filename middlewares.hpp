@@ -506,11 +506,19 @@ namespace remote_ip_guard_detail {
         }
     public:
         // Checks whether the specified IP is allowed under the current rules.
-        inline bool is_ip_allowed(const std::string ip) const noexcept {
+        // Only accepts int32_t and std::string.
+        template<typename T>
+        inline bool is_ip_allowed(const T& ip) const noexcept {
+            static_assert(std::is_same_v<T, int32_t> || std::is_same_v<T, std::string>);
+
             int32_t ipv4 = 0;
-            if (inet_pton(AF_INET, ip.c_str(), &ipv4) != 1) {
-                log_ip_is_not_valid(ip);
-                return false;
+            if constexpr (std::is_same_v<T, int32_t>) {
+                ipv4 = ip;
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                if (inet_pton(AF_INET, ip.c_str(), &ipv4) != 1) {
+                    log_ip_is_not_valid(ip);
+                    return false;
+                }
             }
 
             const bool ip_set_contains = std::binary_search(ip_set.begin(), ip_set.end(), ipv4);
@@ -523,13 +531,17 @@ namespace remote_ip_guard_detail {
         }
 
         // Checks whether the specified IP is forbidden under the current rules.
-        inline bool is_ip_forbidden(const std::string ip) const noexcept {
+        // Only accepts int32_t and std::string.
+        template<typename T>
+        inline bool is_ip_forbidden(const T& ip) const noexcept {
             return !is_ip_allowed(ip);
         }
 
         // Adds the specified IP to the current list.
-        template<const bool _frozen_ips = frozen_ips>
-        typename std::enable_if<!_frozen_ips, self_t&>::type add_ip(const std::string ip) {
+        // Only accepts int32_t and std::string.
+        template<typename T, const bool _frozen_ips = frozen_ips>
+        typename std::enable_if<!_frozen_ips, self_t&>::type add_ip(const T& ip) {
+            static_assert(std::is_same_v<T, int32_t> || std::is_same_v<T, std::string>);
             assert(!frozen && is_valid_ip(ip.c_str()));
 
             if (frozen) {
@@ -538,12 +550,16 @@ namespace remote_ip_guard_detail {
             }
 
             int32_t ipv4 = 0;
-            if (inet_pton(AF_INET, ip.c_str(), &ipv4) != 1) {
-                log_ip_is_not_valid(ip);
-                return *this;
+            if constexpr (std::is_same_v<T, int32_t>) {
+                ipv4 = ip;
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                if (inet_pton(AF_INET, ip.c_str(), &ipv4) != 1) {
+                    log_ip_is_not_valid(ip);
+                    return *this;
+                }
             }
 
-            CROW_LOG_INFO << "Adding IP to the " << ip_list_type_str() << ": " << ip;
+            CROW_LOG_INFO << "Adding IP to the " << ip_list_type_str() << ": " << to_ipv4_string(ip);
 
             insert_into_sorted_vector(ip_set, ipv4);
 
@@ -551,8 +567,10 @@ namespace remote_ip_guard_detail {
         }
 
         // Adds the specified IPs to the current list.
-        template<const bool _frozen_ips = frozen_ips>
-        typename std::enable_if<!_frozen_ips, self_t&>::type add_ips(const std::vector<std::string>& ips) {
+        // Only accepts vectors of int32_t and std::string.
+        template<typename T, const bool _frozen_ips = frozen_ips>
+        typename std::enable_if<!_frozen_ips, self_t&>::type add_ips(const std::vector<T>& ips) {
+            static_assert(std::is_same_v<T, int32_t> || std::is_same_v<T, std::string>);
             assert(!frozen);
 
             if (frozen) {
@@ -563,16 +581,22 @@ namespace remote_ip_guard_detail {
             if (ips.size() == 0) return *this;
 
             std::vector<int32_t> parsed;
-            parsed.reserve(ips.size());
-            for (auto it = ips.begin(); it != ips.end(); ++it) {
-                int32_t ipv4 = 0;
-                if (inet_pton(AF_INET, it->c_str(), &ipv4) != 1) {
-                    log_ip_is_not_valid(*it);
-                    return *this;
-                }
+            if constexpr (std::is_same_v<T, int32_t>) {
+                parsed = ips;
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                std::vector<int32_t> parsed;
+                parsed.reserve(ips.size());
+                for (auto it = ips.begin(); it != ips.end(); ++it) {
+                    int32_t ipv4 = 0;
+                    if (inet_pton(AF_INET, it->c_str(), &ipv4) != 1) {
+                        log_ip_is_not_valid(*it);
+                        return *this;
+                    }
 
-                parsed.push_back(ipv4);
+                    parsed.push_back(ipv4);
+                }
             }
+
             std::sort(parsed.begin(), parsed.end());
             parsed.erase(std::unique(parsed.begin(), parsed.end()), parsed.end());
 
@@ -618,8 +642,10 @@ namespace remote_ip_guard_detail {
         }
 
         // Removes the specified IP from the current list.
-        template<const bool _frozen_ips = frozen_ips>
+        // Only accepts int32_t and std::string.
+        template<typename T, const bool _frozen_ips = frozen_ips>
         typename std::enable_if<!_frozen_ips, self_t&>::type remove_ip(const std::string ip) {
+            static_assert(std::is_same_v<T, int32_t> || std::is_same_v<T, std::string>);
             assert(!frozen && is_valid_ip(ip.c_str()));
 
             if (frozen) {
@@ -628,12 +654,16 @@ namespace remote_ip_guard_detail {
             }
 
             int32_t ipv4 = 0;
-            if (inet_pton(AF_INET, ip.c_str(), &ipv4) != 1) {
-                log_ip_is_not_valid(ip);
-                return *this;
+            if constexpr (std::is_same_v<T, int32_t>) {
+                ipv4 = ip;
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                if (inet_pton(AF_INET, ip.c_str(), &ipv4) != 1) {
+                    log_ip_is_not_valid(ip);
+                    return *this;
+                }
             }
 
-            CROW_LOG_INFO << "Removing IP from the " << ip_list_type_str() << ": " << ip;
+            CROW_LOG_INFO << "Removing IP from the " << ip_list_type_str() << ": " << to_ipv4_string(ip);
 
             erase_from_sorted_vector(ip_set, ipv4);
 
