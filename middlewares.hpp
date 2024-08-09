@@ -136,22 +136,14 @@ namespace crow_middlewares_detail {
 #if __cplusplus >= 202002L // c++20
     template<typename T>
     struct empty_type_template {
-        constexpr empty_type_template(auto&&...) {}
+        constexpr empty_type_template([[maybe_unused]] auto&&...) {}
     };
 
     #define empty_type empty_type_template<decltype([]{})>
 #else
     struct empty_type {
-        constexpr empty_type() {}
-
-        template<typename T>
-        constexpr empty_type([[maybe_unused]] T _) {}
-
-        template<typename T1, typename T2>
-        constexpr empty_type([[maybe_unused]] T1 _, [[maybe_unused]] T2 __) {}
-
-        template<typename T1, typename T2, typename T3>
-        constexpr empty_type([[maybe_unused]] T1 _, [[maybe_unused]] T2 __, [[maybe_unused]] T3 ___) {}
+        template<typename... Ts>
+        constexpr empty_type([[maybe_unused]] Ts&&...) {}
     };
 #endif // __cplusplus >= 202002L // c++20
 
