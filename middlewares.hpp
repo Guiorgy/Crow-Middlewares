@@ -169,9 +169,13 @@ namespace crow_middlewares_detail {
         }
     }
 
-    // Checks if a string is a valid IPv4 address, or a comma-separated list of IPv4 addresses.
-    constexpr bool is_valid_ips(const char* ips, const bool can_be_list = true) noexcept {
-        if (is_null_or_empty(ips)) return can_be_list;
+    // Counts the number of IPv4 addresses in a comma-separated list.
+    // Returns -1 if the format is invalid, or count is greater than max_count.
+    template<const bool unique = true, const size_t default_max_count = std::numeric_limits<size_t>::max()>
+    constexpr size_t count_ips(const char* ips, const size_t max_count = default_max_count) noexcept {
+        if (is_null_or_empty(ips)) return 0;
+
+        size_t count = 0;
 
         int ip_len = 0;
         char subnet[4] = {'0'}; subnet[3] = '\0';
@@ -180,7 +184,7 @@ namespace crow_middlewares_detail {
         int dots = 0;
 
         while (*ips != '\0') {
-            if (ip_len == 15) return false;
+            if (ip_len == 15) return -1;
 
             switch (*ips) {
                 case '0':
@@ -195,17 +199,19 @@ namespace crow_middlewares_detail {
                 case '7': [[fallthrough]];
                 case '8': [[fallthrough]];
                 case '9':
-                    if (subnet_len == 3 || (leading_zero && subnet_len != 0)) return false;
+                    if (subnet_len == 3 || (leading_zero && subnet_len != 0)) return -1;
 
                     subnet[subnet_len++] = *ips;
                     ip_len++;
 
                     break;
                 case ',':
-                    if (!can_be_list || dots != 3 || subnet_len == 0) return false;
+                    if (count == max_count || dots != 3 || subnet_len == 0) return -1;
 
                     subnet[subnet_len] = '\0';
-                    if (!is_valid_subnet(subnet)) return false;
+                    if (!is_valid_subnet(subnet)) return -1;
+
+                    count++;
 
                     subnet_len = 0;
                     leading_zero = false;
@@ -214,10 +220,10 @@ namespace crow_middlewares_detail {
 
                     break;
                 case '.':
-                    if (dots == 3) return false;
+                    if (dots == 3) return -1;
 
                     subnet[subnet_len] = '\0';
-                    if (!is_valid_subnet(subnet)) return false;
+                    if (!is_valid_subnet(subnet)) return -1;
 
                     subnet_len = 0;
                     leading_zero = false;
@@ -226,23 +232,30 @@ namespace crow_middlewares_detail {
 
                     break;
                 default:
-                    return false;
+                    return -1;
             }
 
             ips++;
         }
 
-        if (dots != 3 || subnet_len == 0) return false;
+        if (count == max_count || dots != 3 || subnet_len == 0) return -1;
 
         subnet[subnet_len] = '\0';
-        if (!is_valid_subnet(subnet)) return false;
+        if (!is_valid_subnet(subnet)) return -1;
 
-        return true;
+        count++;
+
+        return count;
     }
 
-    // An alias of is_valid_ips that checks if a string is a valid IPv4 address.
+    // Checks if a string is a valid comma-separated list of IPv4 addresses.
+    constexpr bool is_valid_ips(const char* ips) noexcept {
+        return count_ips(ips) != (size_t)-1;
+    }
+
+    // Checks if a string is a valid IPv4 address.
     constexpr inline bool is_valid_ip(const char* ip) noexcept {
-        return is_valid_ips(ip, false);
+        return count_ips(ip, 1) == 1;
     }
 
     // Converts a 32 bit integer into its IPv4 string representation.
