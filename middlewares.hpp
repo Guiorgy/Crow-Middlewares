@@ -40,7 +40,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <algorithm>
 #include <charconv>
 #include <cassert>
+#include <limits>
 #include <vector>
+#include <array>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 #include <ws2tcpip.h>
@@ -147,135 +149,6 @@ namespace crow_middlewares_detail {
     };
 #endif // __cplusplus >= 202002L // c++20
 
-    // Checks if the null-terminated string is nullptr or empty.
-    constexpr bool is_null_or_empty(const char* str) {
-        return str == nullptr || *str == '\0';
-    }
-
-    // Checks if a string is valid IPv4 subnet (0-255).
-    // Assumes that all characters are digits and the subnet char array is null-terminated.
-    constexpr bool is_valid_subnet(const char* subnet) noexcept {
-        size_t len = 0;
-        while (len <= 3 && subnet[len] != '\0') len++;
-
-        switch (len) {
-            case 1: [[fallthrough]];
-            case 2:
-                return true;
-            case 3:
-                return subnet[0] < '2' || (subnet[0] == '2' && (subnet[1] < '5' || (subnet[1] == '5' && subnet[2] <= '5')));
-            default:
-                return false;
-        }
-    }
-
-    // Counts the number of IPv4 addresses in a comma-separated list.
-    // Returns -1 if the format is invalid, or count is greater than max_count.
-    template<const bool unique = true, const size_t default_max_count = std::numeric_limits<size_t>::max()>
-    constexpr size_t count_ips(const char* ips, const size_t max_count = default_max_count) noexcept {
-        if (is_null_or_empty(ips)) return 0;
-
-        size_t count = 0;
-
-        int ip_len = 0;
-        char subnet[4] = {'0'}; subnet[3] = '\0';
-        int subnet_len = 0;
-        bool leading_zero = false;
-        int dots = 0;
-
-        while (*ips != '\0') {
-            if (ip_len == 15) return -1;
-
-            switch (*ips) {
-                case '0':
-                    leading_zero = leading_zero || subnet_len == 0;
-                    [[fallthrough]];
-                case '1': [[fallthrough]];
-                case '2': [[fallthrough]];
-                case '3': [[fallthrough]];
-                case '4': [[fallthrough]];
-                case '5': [[fallthrough]];
-                case '6': [[fallthrough]];
-                case '7': [[fallthrough]];
-                case '8': [[fallthrough]];
-                case '9':
-                    if (subnet_len == 3 || (leading_zero && subnet_len != 0)) return -1;
-
-                    subnet[subnet_len++] = *ips;
-                    ip_len++;
-
-                    break;
-                case ',':
-                    if (count == max_count || dots != 3 || subnet_len == 0) return -1;
-
-                    subnet[subnet_len] = '\0';
-                    if (!is_valid_subnet(subnet)) return -1;
-
-                    count++;
-
-                    subnet_len = 0;
-                    leading_zero = false;
-                    dots = 0;
-                    ip_len = 0;
-
-                    break;
-                case '.':
-                    if (dots == 3) return -1;
-
-                    subnet[subnet_len] = '\0';
-                    if (!is_valid_subnet(subnet)) return -1;
-
-                    subnet_len = 0;
-                    leading_zero = false;
-                    dots++;
-                    ip_len++;
-
-                    break;
-                default:
-                    return -1;
-            }
-
-            ips++;
-        }
-
-        if (count == max_count || dots != 3 || subnet_len == 0) return -1;
-
-        subnet[subnet_len] = '\0';
-        if (!is_valid_subnet(subnet)) return -1;
-
-        count++;
-
-        return count;
-    }
-
-    // Checks if a string is a valid comma-separated list of IPv4 addresses.
-    constexpr bool is_valid_ips(const char* ips) noexcept {
-        return count_ips(ips) != (size_t)-1;
-    }
-
-    // Checks if a string is a valid IPv4 address.
-    constexpr inline bool is_valid_ip(const char* ip) noexcept {
-        return count_ips(ip, 1) == 1;
-    }
-
-    // Converts a 32 bit integer into its IPv4 string representation.
-    std::string int_to_ipv4_string(const int32_t ip) {
-        std::string output(4 * 3 + 3, '\0');
-
-        char *point = output.data();
-        char *point_end = output.data() + output.size();
-
-        point = std::to_chars(point, point_end, uint8_t(ip)).ptr;
-        for (int i = 1; i < 4; i++) {
-            *point++ = '.';
-            point = std::to_chars(point, point_end, uint8_t(ip >> (i * 8))).ptr;
-        }
-
-        output.resize(point - output.data());
-
-        return output;
-    }
-
     // Inserts a value into a sorted vector while preserving order.
     // The value is not inserted if an equivalent element is already present in the vector.
     template<typename T>
@@ -302,6 +175,177 @@ namespace crow_middlewares_detail {
 
         return false;
     }
+
+    // Checks if the null-terminated string is nullptr or empty.
+    constexpr bool is_null_or_empty(const char* str) {
+        return str == nullptr || *str == '\0';
+    }
+
+    // Checks if a string is valid IPv4 subnet (0-255).
+    // Assumes that all characters are digits and the subnet char array is null-terminated.
+    constexpr bool is_valid_subnet(const char* subnet) noexcept {
+        size_t len = 0;
+        while (len <= 3 && subnet[len] != '\0') len++;
+
+        switch (len) {
+            case 1: [[fallthrough]];
+            case 2:
+                return true;
+            case 3:
+                return subnet[0] < '2' || (subnet[0] == '2' && (subnet[1] < '5' || (subnet[1] == '5' && subnet[2] <= '5')));
+            default:
+                return false;
+        }
+    }
+
+    // Counts the number of IPv4 addresses in a comma-separated list.
+    // If unique is true, only counts unique entries.
+    // Returns -1 if the format is invalid, or count is greater than max_count.
+    template<const bool unique = true>
+    constexpr size_t count_ips(const char* ips, const size_t max_count = std::numeric_limits<size_t>::max()) noexcept {
+        if (is_null_or_empty(ips)) return 0;
+
+        using count_t = std::conditional_t<unique, std::vector<int32_t>, size_t>;
+        count_t count = count_t();
+
+        int ip_len = 0;
+        char subnet[4] = {'0'}; subnet[3] = '\0';
+        int subnet_len = 0;
+        bool leading_zero = false;
+        int dots = 0;
+
+        int32_t ipv4 = 0;
+        int shift = 0;
+
+        while (*ips != '\0') {
+            if (ip_len == 15) return -1;
+
+            switch (*ips) {
+                case '0':
+                    leading_zero = leading_zero || subnet_len == 0;
+                    [[fallthrough]];
+                case '1': [[fallthrough]];
+                case '2': [[fallthrough]];
+                case '3': [[fallthrough]];
+                case '4': [[fallthrough]];
+                case '5': [[fallthrough]];
+                case '6': [[fallthrough]];
+                case '7': [[fallthrough]];
+                case '8': [[fallthrough]];
+                case '9':
+                    if (subnet_len == 3 || (leading_zero && subnet_len != 0)) return -1;
+
+                    subnet[subnet_len++] = *ips;
+                    ip_len++;
+
+                    break;
+                case ',':
+                    if constexpr (!unique) {
+                        if (count == max_count) return -1;
+                    }
+                    if (dots != 3 || subnet_len == 0) return -1;
+
+                    subnet[subnet_len] = '\0';
+
+                    if constexpr (!unique) {
+                        if (!is_valid_subnet(subnet)) return -1;
+
+                        count++;
+                    } else {
+                        int32_t _byte = std::stoi(subnet, nullptr, 10);
+                        if (_byte > 255) return -1;
+
+                        ipv4 |= (_byte << shift);
+
+                        insert_into_sorted_vector(count, ipv4);
+                    }
+
+                    subnet_len = 0;
+                    leading_zero = false;
+                    dots = 0;
+                    ip_len = 0;
+
+                    break;
+                case '.':
+                    if (dots == 3) return -1;
+
+                    subnet[subnet_len] = '\0';
+
+                    if constexpr (!unique) {
+                        if (!is_valid_subnet(subnet)) return -1;
+                    } else {
+                        int32_t _byte = std::stoi(subnet, nullptr, 10);
+                        if (_byte > 255) return -1;
+
+                        ipv4 |= (_byte << shift);
+                        shift += 8;
+                    }
+
+                    subnet_len = 0;
+                    leading_zero = false;
+                    dots++;
+                    ip_len++;
+
+                    break;
+                default:
+                    return -1;
+            }
+
+            ips++;
+        }
+
+        if constexpr (!unique) {
+            if (count == max_count) return -1;
+        }
+        if (dots != 3 || subnet_len == 0) return -1;
+
+        subnet[subnet_len] = '\0';
+
+        if constexpr (!unique) {
+            if (!is_valid_subnet(subnet)) return -1;
+
+            count++;
+
+            return count;
+        } else {
+            int32_t _byte = std::stoi(subnet, nullptr, 10);
+            if (_byte > 255) return -1;
+
+            ipv4 |= (_byte << shift);
+
+            insert_into_sorted_vector(count, ipv4);
+
+            return count.size() <= max_count ? count.size() : -1;
+        }
+    }
+
+    // Checks if a string is a valid comma-separated list of IPv4 addresses.
+    constexpr bool is_valid_ips(const char* ips) noexcept {
+        return count_ips<false>(ips) != (size_t)-1;
+    }
+
+    // Checks if a string is a valid IPv4 address.
+    constexpr inline bool is_valid_ip(const char* ip) noexcept {
+        return count_ips<false>(ip, 1) == 1;
+    }
+
+    // Converts a 32 bit integer into its IPv4 string representation.
+    std::string int_to_ipv4_string(const int32_t ip) {
+        std::string output(4 * 3 + 3, '\0');
+
+        char *point = output.data();
+        char *point_end = output.data() + output.size();
+
+        point = std::to_chars(point, point_end, uint8_t(ip)).ptr;
+        for (int i = 1; i < 4; i++) {
+            *point++ = '.';
+            point = std::to_chars(point, point_end, uint8_t(ip >> (i * 8))).ptr;
+        }
+
+        output.resize(point - output.data());
+
+        return output;
+    }
 } // namespace crow_middlewares_detail
 
 namespace remote_ip_guard_detail {
@@ -317,18 +361,19 @@ namespace remote_ip_guard_detail {
 
     // A Crow middleware that can take a white/black list of IPv4 addresses at compile time or runtime and block incoming requests that don't match the given list.
     // Currently only IPv4 is supported.
-    template<const char* ip_list, const bool whitelist>
+    template<const char* ip_list, const bool whitelist, const size_t ip_list_count>
     class RemoteIpGuard {
         static_assert(is_valid_ips(ip_list), "The template argument ip_list is not valid");
 
         using self_t = RemoteIpGuard;
+        static constexpr size_t ip_list_count = count_ips(ip_list);
 
-        // Make ip_set a const if ip_list is not nullptr or empty.
-        using current_ip_set_t = std::conditional_t<!is_null_or_empty(ip_list), const std::vector<int32_t>, std::vector<int32_t>>;
+        // Make ip_set a const array<int32_t> if ip_list is not nullptr or empty.
+        using current_ip_set_t = std::conditional_t<ip_list_count != 0, const std::array<int32_t, ip_list_count>, std::vector<int32_t>>;
         current_ip_set_t ip_set = parse_ip_list_template_arg();
 
         // Define frozen only if ip_list is nullptr or empty.
-        using current_frozen_t = std::conditional_t<is_null_or_empty(ip_list), bool, empty_type>;
+        using current_frozen_t = std::conditional_t<ip_list_count == 0, bool, empty_type>;
         [[no_unique_address]] current_frozen_t frozen = current_frozen_t();
 
         // Returns the type of list in use.
@@ -363,7 +408,9 @@ namespace remote_ip_guard_detail {
 
     public:
         RemoteIpGuard() {
-            if constexpr (!is_null_or_empty(ip_list)) {
+            CROW_LOG_INFO << "ips count " << ip_list_count;
+
+            if constexpr (ip_list_count != 0) {
                 CROW_LOG_INFO << "Initialized the " << ip_list_type_str() << " with " << ip_set.size() << " IPs: " << get_ip_list_str();
             }
         }
@@ -380,23 +427,23 @@ namespace remote_ip_guard_detail {
         }
 
         void after_handle([[maybe_unused]] crow::request& req, [[maybe_unused]] crow::response& res, [[maybe_unused]] context& ctx) {
-            if constexpr (is_null_or_empty(ip_list)) {
+            if constexpr (ip_list_count == 0) {
                 // Modifications during runtime may invalidate iterators that are being used for allowing/denying requests.
                 if (!frozen) freeze();
             }
         }
 
     private:
-        // Parses a string formatted as a comma-separated list of IPv4 addresses and returns a vector with their integer representations.
+        // Parses a string formatted as a comma-separated list of IPv4 addresses and returns a std::array/std::vector with their integer representations.
         // Assumes that the ip_list string formatted correctly, in other words, it's been validated using the is_valid_ips function.
-        constexpr std::vector<int32_t> parse_ip_list_template_arg() const {
-            if (is_null_or_empty(ip_list)) return {};
+        constexpr current_ip_set_t parse_ip_list_template_arg() const {
+            if (ip_list_count == 0) return {};
 
-            std::vector<int32_t> _ip_set;
+            std::vector<int32_t> _ip_set_vec;
 
             const char* aip = ip_list;
 
-            char ip_buffer[16] = {0};
+            char ip_buffer[16] = {'\0'};
             int ip_len = 0;
 
             int subnet_len = 0;
@@ -429,7 +476,7 @@ namespace remote_ip_guard_detail {
 
                         ip_buffer[ip_len] = '\0';
                         inet_pton(AF_INET, ip_buffer, &ipv4);
-                        insert_into_sorted_vector(_ip_set, ipv4);
+                        insert_into_sorted_vector(_ip_set_vec, ipv4);
 
                         subnet_len = 0;
                         dots = 0;
@@ -456,11 +503,18 @@ namespace remote_ip_guard_detail {
 
             ip_buffer[ip_len] = '\0';
             inet_pton(AF_INET, ip_buffer, &ipv4);
-            insert_into_sorted_vector(_ip_set, ipv4);
+            insert_into_sorted_vector(_ip_set_vec, ipv4);
 
-            _ip_set.shrink_to_fit();
+            if constexpr (std::is_same_v<current_ip_set_t, std::vector<int32_t>>) {
+                _ip_set_vec.shrink_to_fit();
 
-            return _ip_set;
+                return _ip_set_vec;
+            } else {
+                std::array<int32_t, ip_list_count> _ip_set;
+                std::move(_ip_set_vec.begin(), _ip_set_vec.begin() + ip_list_count, _ip_set.begin());
+
+                return _ip_set;
+            }
         }
 
         // Converts an integer or string into an IPv4 string.
@@ -477,17 +531,20 @@ namespace remote_ip_guard_detail {
         }
 
         // Returns a comma-separated list of IPv4 addresses representing the specified list.
-        // Only accepts vectors of int32_t and std::string.
+        // Only accepts std::vector/std::arrays of int32_t and std::string.
         template<typename T>
-        std::string get_ip_list_str(const std::vector<T>& ips) const noexcept {
-            static_assert(std::is_same_v<T, int32_t> || std::is_same_v<T, std::string>);
+        std::string get_ip_list_str(const T& ips) const noexcept {
+            static_assert(
+                std::is_same_v<T, std::array<int32_t, ip_list_count>> || std::is_same_v<T, std::array<std::string, ip_list_count>>
+                || std::is_same_v<T, std::vector<int32_t>> || std::is_same_v<T, std::vector<std::string>>
+            );
 
             if (ips.size() == 0) return "";
 
             std::string str;
 
-            const size_t ip_max_size = 15; // ***.***.***.***
-            const size_t ip_list_separator = 2; // comma + space
+            constexpr size_t ip_max_size = 15; // ***.***.***.***
+            constexpr size_t ip_list_separator = 2; // comma + space
             str.reserve((ip_max_size + ip_list_separator) * ips.size());
 
             auto it = ips.begin();
@@ -551,7 +608,7 @@ namespace remote_ip_guard_detail {
 
         // Adds the specified IP to the current list.
         // Only accepts int32_t and std::string.
-        template<typename T, const bool compile_time = !is_null_or_empty(ip_list)>
+        template<typename T, const bool compile_time = ip_list_count != 0>
         typename std::enable_if<!compile_time, self_t&>::type add_ip(const T& ip) {
             static_assert(std::is_same_v<T, int32_t> || std::is_same_v<T, std::string>);
             assert(!frozen && is_valid_ip(ip.c_str()));
@@ -580,7 +637,7 @@ namespace remote_ip_guard_detail {
 
         // Adds the specified IPs to the current list.
         // Only accepts vectors of int32_t and std::string.
-        template<typename T, const bool compile_time = !is_null_or_empty(ip_list)>
+        template<typename T, const bool compile_time = ip_list_count != 0>
         typename std::enable_if<!compile_time, self_t&>::type add_ips(const std::vector<T>& ips) {
             static_assert(std::is_same_v<T, int32_t> || std::is_same_v<T, std::string>);
             assert(!frozen);
@@ -655,7 +712,7 @@ namespace remote_ip_guard_detail {
 
         // Removes the specified IP from the current list.
         // Only accepts int32_t and std::string.
-        template<typename T, const bool compile_time = !is_null_or_empty(ip_list)>
+        template<typename T, const bool compile_time = ip_list_count != 0>
         typename std::enable_if<!compile_time, self_t&>::type remove_ip(const std::string ip) {
             static_assert(std::is_same_v<T, int32_t> || std::is_same_v<T, std::string>);
             assert(!frozen && is_valid_ip(ip.c_str()));
@@ -683,7 +740,7 @@ namespace remote_ip_guard_detail {
         }
 
         // Removes all IPs from the current list.
-        template<const bool compile_time = !is_null_or_empty(ip_list)>
+        template<const bool compile_time = ip_list_count != 0>
         typename std::enable_if<!compile_time, self_t&>::type clear_ips() {
             assert(!frozen);
 
@@ -702,14 +759,14 @@ namespace remote_ip_guard_detail {
         }
 
         // Checks if the current list is already frozen.
-        template<const bool compile_time = !is_null_or_empty(ip_list)>
+        template<const bool compile_time = ip_list_count != 0>
         typename std::enable_if<!compile_time, bool>::type is_frozen() {
             return frozen;
         }
 
         // Freezes the current list.
         // Any subsequent attempts to modify the list will be ignored.
-        template<const bool compile_time = !is_null_or_empty(ip_list)>
+        template<const bool compile_time = ip_list_count != 0>
         typename std::enable_if<!compile_time, self_t&>::type freeze() {
             assert(!frozen);
 
