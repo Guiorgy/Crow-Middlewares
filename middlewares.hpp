@@ -276,8 +276,8 @@ namespace crow_middlewares_detail {
         return output;
     }
 
-    // Inserts a value into a sorted vector while preserving order.
-    // The value is not inserted if an equivalent element is already present in the vector.
+    // Inserts a value into a sorted std::vector while preserving order.
+    // The value is not inserted if an equivalent element is already present in the std::vector.
     template<typename T>
     constexpr inline bool insert_into_sorted_vector(std::vector<T>& vector, const T& value) {
         auto it = std::lower_bound(vector.begin(), vector.end(), value);
@@ -290,7 +290,7 @@ namespace crow_middlewares_detail {
         return false;
     }
 
-    // Removes a value from a sorted vector using binary search.
+    // Removes a value from a sorted std::vector using binary search.
     template<typename T>
     constexpr inline bool erase_from_sorted_vector(std::vector<T>& vector, const T& value) {
         auto it = std::lower_bound(vector.begin(), vector.end(), value);
@@ -477,7 +477,7 @@ namespace remote_ip_guard_detail {
         }
 
         // Returns a comma-separated list of IPv4 addresses representing the specified list.
-        // Only accepts vectors of int32_t and std::string.
+        // Only accepts std::vector of int32_t and std::string.
         template<typename T>
         std::string get_ip_list_str(const std::vector<T>& ips) const noexcept {
             static_assert(std::is_same_v<T, int32_t> || std::is_same_v<T, std::string>);
@@ -579,7 +579,7 @@ namespace remote_ip_guard_detail {
         }
 
         // Adds the specified IPs to the current list.
-        // Only accepts vectors of int32_t and std::string.
+        // Only accepts std::vector of int32_t and std::string.
         template<typename T, const bool compile_time = !is_null_or_empty(ip_list)>
         typename std::enable_if<!compile_time, self_t&>::type add_ips(const std::vector<T>& ips) {
             static_assert(std::is_same_v<T, int32_t> || std::is_same_v<T, std::string>);
@@ -615,11 +615,11 @@ namespace remote_ip_guard_detail {
             CROW_LOG_INFO << "Adding IPs to the " << ip_list_type_str() << ": " << get_ip_list_str(parsed);
 
             if (ip_set.size() == 0) {
-                // Swap ip_set with the temporary vector containing unique parsed sorted input ips
+                // Swap ip_set with the temporary std::vector containing unique parsed sorted input ips
 
                 ip_set.swap(parsed);
             } else {
-                // Merge the temporary vector containing unique parsed sorted input ips and ip_set into another temporary vector while skipping duplicates and then swap that container with ip_set
+                // Merge the temporary std::vector containing unique parsed sorted input ips and ip_set into another temporary std::vector while skipping duplicates and then swap that container with ip_set
 
                 std::vector<int32_t> merged;
                 merged.reserve(ip_set.size() + parsed.size());
