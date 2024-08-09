@@ -319,6 +319,8 @@ namespace remote_ip_guard_detail {
     // Currently only IPv4 is supported.
     template<const char* ip_list, const bool whitelist>
     class RemoteIpGuard {
+        static_assert(is_valid_ips(ip_list), "The template argument ip_list is not valid");
+
         using self_t = RemoteIpGuard;
 
         // Make ip_set a const if ip_list is not nullptr or empty.
@@ -361,8 +363,6 @@ namespace remote_ip_guard_detail {
 
     public:
         RemoteIpGuard() {
-            static_assert(is_valid_ips(ip_list), "The template argument ip_list is not valid");
-
             if constexpr (!is_null_or_empty(ip_list)) {
                 CROW_LOG_INFO << "Initialized the " << ip_list_type_str() << " with " << ip_set.size() << " IPs: " << get_ip_list_str();
             }
