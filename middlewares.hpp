@@ -155,7 +155,7 @@ namespace crow_middlewares_detail {
     // Checks if a string is valid IPv4 subnet (0-255).
     // Assumes that all characters are digits and the subnet char array is null-terminated.
     constexpr bool is_valid_subnet(const char* subnet) noexcept {
-        size_t len = 0;
+        std::size_t len = 0;
         while (len <= 3 && subnet[len] != '\0') len++;
 
         switch (len) {
@@ -172,10 +172,10 @@ namespace crow_middlewares_detail {
     // Counts the number of IPv4 addresses in a comma-separated list.
     // Returns -1 if the format is invalid, or count is greater than max_count.
     // Note: This does not check if the list contains duplicates and counts them all.
-    constexpr size_t count_ips(const char* ips, const size_t max_count = std::numeric_limits<size_t>::max()) noexcept {
+    constexpr std::size_t count_ips(const char* ips, const std::size_t max_count = std::numeric_limits<std::size_t>::max()) noexcept {
         if (is_null_or_empty(ips)) return 0;
 
-        size_t count = 0;
+        std::size_t count = 0;
 
         int ip_len = 0;
         char subnet[4] = {'0'}; subnet[3] = '\0';
@@ -250,7 +250,7 @@ namespace crow_middlewares_detail {
 
     // Checks if a string is a valid comma-separated list of IPv4 addresses.
     constexpr bool is_valid_ips(const char* ips) noexcept {
-        return count_ips(ips) != (size_t)-1;
+        return count_ips(ips) != (std::size_t)-1;
     }
 
     // Checks if a string is a valid IPv4 address.
@@ -486,12 +486,12 @@ namespace remote_ip_guard_detail {
 
             std::string str;
 
-            const size_t ip_max_size = 15; // ***.***.***.***
-            const size_t ip_list_separator = 2; // comma + space
+            const std::size_t ip_max_size = 15; // ***.***.***.***
+            const std::size_t ip_list_separator = 2; // comma + space
             str.reserve((ip_max_size + ip_list_separator) * ips.size());
 
             auto it = ips.begin();
-            for (size_t i = ips.size(); i > 1; i--) {
+            for (std::size_t i = ips.size(); i > 1; i--) {
                 str.append(to_ipv4_string(*it));
                 str.append(", ");
                 ++it;
