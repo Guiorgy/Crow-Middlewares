@@ -315,7 +315,7 @@ namespace remote_ip_guard_detail {
         return ip_list;
     }
 
-    // A Crow middleware that can take a white/black list of IPv4 addresses at compile time or runtime and block incomming requests that don't match the given list.
+    // A Crow middleware that can take a white/black list of IPv4 addresses at compile time or runtime and block incoming requests that don't match the given list.
     // Currently only IPv4 is supported.
     template<const char* ip_list, const bool whitelist>
     class RemoteIpGuard {
@@ -732,20 +732,20 @@ namespace remote_ip_guard_detail {
 } // namespace remote_ip_guard_detail
 
 namespace crow {
-    // A Crow middleware that takes a whitelist of IPv4 addresses at compile time and blocks incomming requests from sources not in the whitelist.
+    // A Crow middleware that takes a whitelist of IPv4 addresses at compile time and blocks incoming requests from sources not in the whitelist.
     // Currently only IPv4 is supported.
     template<const char* allowed_ip_list>
     using WhitelistIpGuard = remote_ip_guard_detail::RemoteIpGuard<remote_ip_guard_detail::assert_not_null_or_empty<allowed_ip_list>(), true>;
 
-    // A Crow middleware that builds a whitelist of IPv4 addresses at runtime and blocks incomming requests from sources not in the whitelist.
+    // A Crow middleware that builds a whitelist of IPv4 addresses at runtime and blocks incoming requests from sources not in the whitelist.
     // Currently only IPv4 is supported.
     using DynamicWhitelistIpGuard = remote_ip_guard_detail::RemoteIpGuard<nullptr, true>;
 
-    // A Crow middleware that takes a blacklist of IPv4 addresses at compile time and blocks incomming requests from sources in the blacklist.
+    // A Crow middleware that takes a blacklist of IPv4 addresses at compile time and blocks incoming requests from sources in the blacklist.
     // Currently only IPv4 is supported.
     template<const char* forbidden_ip_list>
     using BlacklistIpGuard = remote_ip_guard_detail::RemoteIpGuard<remote_ip_guard_detail::assert_not_null_or_empty<forbidden_ip_list>(), false>;
 
-    // A Crow middleware that builds a blacklist of IPv4 addresses at runtime and blocks incomming requests from sources in the blacklist.
+    // A Crow middleware that builds a blacklist of IPv4 addresses at runtime and blocks incoming requests from sources in the blacklist.
     using DynamicBlacklistIpGuard = remote_ip_guard_detail::RemoteIpGuard<nullptr, false>;
 } // namespace crow
