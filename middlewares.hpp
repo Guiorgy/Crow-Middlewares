@@ -302,6 +302,85 @@ namespace crow_middlewares_detail {
 
         return false;
     }
+
+    // Parses a string formatted as a comma-separated list of IPv4 addresses and returns a std::vector with their integer representations.
+    // Assumes that the ips string is formatted correctly, in other words, it's been validated using the is_valid_ips function.
+#if __cplusplus >= 202002L // c++20
+    constexpr
+#endif // __cplusplus >= 202002L // c++20
+    std::vector<int32_t> parse_ips(const char* ips) {
+        if (is_null_or_empty(ips)) return {};
+
+        std::vector<int32_t> ip_set;
+
+        const char* aip = ips;
+
+        char ip_buffer[16] = {0};
+        int ip_len = 0;
+
+        int subnet_len = 0;
+        int dots = 0;
+
+        int32_t ipv4 = 0;
+
+        while (*aip != '\0') {
+            assert(ip_len != 15);
+
+            switch (*aip) {
+                case '0': [[fallthrough]];
+                case '1': [[fallthrough]];
+                case '2': [[fallthrough]];
+                case '3': [[fallthrough]];
+                case '4': [[fallthrough]];
+                case '5': [[fallthrough]];
+                case '6': [[fallthrough]];
+                case '7': [[fallthrough]];
+                case '8': [[fallthrough]];
+                case '9':
+                    assert(subnet_len != 3);
+
+                    subnet_len++;
+                    ip_buffer[ip_len++] = *aip;
+
+                    break;
+                case ',':
+                    assert(dots == 3 && subnet_len != 0);
+
+                    ip_buffer[ip_len] = '\0';
+                    inet_pton(AF_INET, ip_buffer, &ipv4);
+                    insert_into_sorted_vector(ip_set, ipv4);
+
+                    subnet_len = 0;
+                    dots = 0;
+                    ip_len = 0;
+
+                    break;
+                case '.':
+                    assert(dots != 3);
+
+                    subnet_len = 0;
+                    dots++;
+                    ip_buffer[ip_len++] = '.';
+
+                    break;
+                default:
+                    assert(false);
+                    break;
+            }
+
+            aip++;
+        }
+
+        assert(dots == 3 && subnet_len != 0);
+
+        ip_buffer[ip_len] = '\0';
+        inet_pton(AF_INET, ip_buffer, &ipv4);
+        insert_into_sorted_vector(ip_set, ipv4);
+
+        ip_set.shrink_to_fit();
+
+        return ip_set;
+    }
 } // namespace crow_middlewares_detail
 
 namespace remote_ip_guard_detail {
@@ -325,7 +404,7 @@ namespace remote_ip_guard_detail {
 
         // Make ip_set a const if ip_list is not nullptr or empty.
         using current_ip_set_t = std::conditional_t<!is_null_or_empty(ip_list), const std::vector<int32_t>, std::vector<int32_t>>;
-        current_ip_set_t ip_set = parse_ip_list_template_arg();
+        current_ip_set_t ip_set = parse_ips(ip_list);
 
         // Define frozen only if ip_list is nullptr or empty.
         using current_frozen_t = std::conditional_t<is_null_or_empty(ip_list), bool, empty_type>;
@@ -387,82 +466,6 @@ namespace remote_ip_guard_detail {
         }
 
     private:
-        // Parses a string formatted as a comma-separated list of IPv4 addresses and returns a vector with their integer representations.
-        // Assumes that the ip_list string formatted correctly, in other words, it's been validated using the is_valid_ips function.
-        constexpr std::vector<int32_t> parse_ip_list_template_arg() const {
-            if (is_null_or_empty(ip_list)) return {};
-
-            std::vector<int32_t> _ip_set;
-
-            const char* aip = ip_list;
-
-            char ip_buffer[16] = {0};
-            int ip_len = 0;
-
-            int subnet_len = 0;
-            int dots = 0;
-
-            int32_t ipv4 = 0;
-
-            while (*aip != '\0') {
-                assert(ip_len != 15);
-
-                switch (*aip) {
-                    case '0': [[fallthrough]];
-                    case '1': [[fallthrough]];
-                    case '2': [[fallthrough]];
-                    case '3': [[fallthrough]];
-                    case '4': [[fallthrough]];
-                    case '5': [[fallthrough]];
-                    case '6': [[fallthrough]];
-                    case '7': [[fallthrough]];
-                    case '8': [[fallthrough]];
-                    case '9':
-                        assert(subnet_len != 3);
-
-                        subnet_len++;
-                        ip_buffer[ip_len++] = *aip;
-
-                        break;
-                    case ',':
-                        assert(dots == 3 && subnet_len != 0);
-
-                        ip_buffer[ip_len] = '\0';
-                        inet_pton(AF_INET, ip_buffer, &ipv4);
-                        insert_into_sorted_vector(_ip_set, ipv4);
-
-                        subnet_len = 0;
-                        dots = 0;
-                        ip_len = 0;
-
-                        break;
-                    case '.':
-                        assert(dots != 3);
-
-                        subnet_len = 0;
-                        dots++;
-                        ip_buffer[ip_len++] = '.';
-
-                        break;
-                    default:
-                        assert(false);
-                        break;
-                }
-
-                aip++;
-            }
-
-            assert(dots == 3 && subnet_len != 0);
-
-            ip_buffer[ip_len] = '\0';
-            inet_pton(AF_INET, ip_buffer, &ipv4);
-            insert_into_sorted_vector(_ip_set, ipv4);
-
-            _ip_set.shrink_to_fit();
-
-            return _ip_set;
-        }
-
         // Converts an integer or string into an IPv4 string.
         // Only accepts int32_t and std::string.
         template<typename T>
