@@ -147,6 +147,13 @@ namespace crow_middlewares_detail {
     };
 #endif // __cplusplus >= 202002L // c++20
 
+    // The size threshold when searching in a container at which point binary search should be used instead of linear search.
+    #ifdef CROW_MIDDLEWARES_BINARY_SEARCH_THRESHOLD
+    static const std::size_t binary_search_threshold = CROW_MIDDLEWARES_BINARY_SEARCH_THRESHOLD;
+    #else
+    static const std::size_t binary_search_threshold = 8;
+    #endif // CROW_MIDDLEWARES_BINARY_SEARCH_THRESHOLD
+
     // Checks if the null-terminated string is nullptr or empty.
     constexpr bool is_null_or_empty(const char* str) {
         return str == nullptr || *str == '\0';
@@ -536,7 +543,10 @@ namespace remote_ip_guard_detail {
                 }
             }
 
-            const bool ip_set_contains = std::binary_search(ip_set.begin(), ip_set.end(), ipv4);
+            const bool ip_set_contains =
+                ip_set.size() <= binary_search_threshold
+                    ? std::find(ip_set.begin(), ip_set.end(), ipv4) != ip_set.end()
+                    : std::binary_search(ip_set.begin(), ip_set.end(), ipv4);
 
             if constexpr (whitelist) {
                 return ip_set_contains;
