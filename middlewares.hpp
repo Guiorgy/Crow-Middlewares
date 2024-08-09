@@ -170,10 +170,8 @@ namespace crow_middlewares_detail {
     }
 
     // Checks if a string is a valid IPv4 address, or a comma-separated list of IPv4 addresses.
-    // can_be_null_or_empty must not be true when can_be_list is false.
-    constexpr bool is_valid_ips(const char* ips, const bool can_be_null_or_empty = true, const bool can_be_list = true) noexcept {
-        assert(!can_be_null_or_empty || can_be_list); // A single empty or nullptr IP makes no sense.
-        if (is_null_or_empty(ips)) return can_be_null_or_empty;
+    constexpr bool is_valid_ips(const char* ips, const bool can_be_list = true) noexcept {
+        if (is_null_or_empty(ips)) return can_be_list;
 
         int ip_len = 0;
         char subnet[4] = {'0'}; subnet[3] = '\0';
@@ -244,7 +242,7 @@ namespace crow_middlewares_detail {
 
     // An alias of is_valid_ips that checks if a string is a valid IPv4 address.
     constexpr inline bool is_valid_ip(const char* ip) noexcept {
-        return is_valid_ips(ip, false, false);
+        return is_valid_ips(ip, false);
     }
 
     // Converts a 32 bit integer into its IPv4 string representation.
@@ -296,18 +294,26 @@ namespace crow_middlewares_detail {
 namespace remote_ip_guard_detail {
     using namespace crow_middlewares_detail;
 
+    // Statically asserts that ip_list is not nullptr or empty.
+    template<const char* ip_list>
+    constexpr const char* assert_not_null_or_empty() {
+        static_assert(!is_null_or_empty(ip_list), "ip_list must not be nullptr or empty");
+
+        return ip_list;
+    }
+
     // A Crow middleware that can take a white/black list of IPv4 addresses at compile time or runtime and block incomming requests that don't match the given list.
     // Currently only IPv4 is supported.
-    template<const char* ip_list, const bool whitelist, const bool frozen_ips>
+    template<const char* ip_list, const bool whitelist>
     class RemoteIpGuard {
         using self_t = RemoteIpGuard;
 
-        // Make ip_set a const if frozen_ips is true.
-        using current_ip_set_t = std::conditional_t<frozen_ips, const std::vector<int32_t>, std::vector<int32_t>>;
+        // Make ip_set a const if ip_list is not nullptr or empty.
+        using current_ip_set_t = std::conditional_t<!is_null_or_empty(ip_list), const std::vector<int32_t>, std::vector<int32_t>>;
         current_ip_set_t ip_set = parse_ip_list_template_arg();
 
-        // Define frozen only if frozen_ips is false.
-        using current_frozen_t = std::conditional_t<frozen_ips, empty_type, bool>;
+        // Define frozen only if ip_list is nullptr or empty.
+        using current_frozen_t = std::conditional_t<is_null_or_empty(ip_list), bool, empty_type>;
         [[no_unique_address]] current_frozen_t frozen = current_frozen_t();
 
         // Returns the type of list in use.
@@ -342,7 +348,7 @@ namespace remote_ip_guard_detail {
 
     public:
         RemoteIpGuard() {
-            static_assert(is_valid_ips(ip_list, !frozen_ips), "The template argument ip_list is not valid");
+            static_assert(is_valid_ips(ip_list), "The template argument ip_list is not valid");
 
             if constexpr (!is_null_or_empty(ip_list)) {
                 CROW_LOG_INFO << "Initialized the " << ip_list_type_str() << " with " << ip_set.size() << " IPs: " << get_ip_list_str();
@@ -361,7 +367,7 @@ namespace remote_ip_guard_detail {
         }
 
         void after_handle([[maybe_unused]] crow::request& req, [[maybe_unused]] crow::response& res, [[maybe_unused]] context& ctx) {
-            if constexpr (!frozen_ips) {
+            if constexpr (is_null_or_empty(ip_list)) {
                 // Modifications during runtime may invalidate iterators that are being used for allowing/denying requests.
                 if (!frozen) freeze();
             }
@@ -532,8 +538,8 @@ namespace remote_ip_guard_detail {
 
         // Adds the specified IP to the current list.
         // Only accepts int32_t and std::string.
-        template<typename T, const bool _frozen_ips = frozen_ips>
-        typename std::enable_if<!_frozen_ips, self_t&>::type add_ip(const T& ip) {
+        template<typename T, const bool compile_time = !is_null_or_empty(ip_list)>
+        typename std::enable_if<!compile_time, self_t&>::type add_ip(const T& ip) {
             static_assert(std::is_same_v<T, int32_t> || std::is_same_v<T, std::string>);
             assert(!frozen && is_valid_ip(ip.c_str()));
 
@@ -561,8 +567,8 @@ namespace remote_ip_guard_detail {
 
         // Adds the specified IPs to the current list.
         // Only accepts vectors of int32_t and std::string.
-        template<typename T, const bool _frozen_ips = frozen_ips>
-        typename std::enable_if<!_frozen_ips, self_t&>::type add_ips(const std::vector<T>& ips) {
+        template<typename T, const bool compile_time = !is_null_or_empty(ip_list)>
+        typename std::enable_if<!compile_time, self_t&>::type add_ips(const std::vector<T>& ips) {
             static_assert(std::is_same_v<T, int32_t> || std::is_same_v<T, std::string>);
             assert(!frozen);
 
@@ -635,8 +641,8 @@ namespace remote_ip_guard_detail {
 
         // Removes the specified IP from the current list.
         // Only accepts int32_t and std::string.
-        template<typename T, const bool _frozen_ips = frozen_ips>
-        typename std::enable_if<!_frozen_ips, self_t&>::type remove_ip(const T& ip) {
+        template<typename T, const bool compile_time = !is_null_or_empty(ip_list)>
+        typename std::enable_if<!compile_time, self_t&>::type remove_ip(const T& ip) {
             static_assert(std::is_same_v<T, int32_t> || std::is_same_v<T, std::string>);
             assert(!frozen && is_valid_ip(ip.c_str()));
 
@@ -663,8 +669,8 @@ namespace remote_ip_guard_detail {
         }
 
         // Removes all IPs from the current list.
-        template<const bool _frozen_ips = frozen_ips>
-        typename std::enable_if<!_frozen_ips, self_t&>::type clear_ips() {
+        template<const bool compile_time = !is_null_or_empty(ip_list)>
+        typename std::enable_if<!compile_time, self_t&>::type clear_ips() {
             assert(!frozen);
 
             if (frozen) {
@@ -682,15 +688,15 @@ namespace remote_ip_guard_detail {
         }
 
         // Checks if the current list is already frozen.
-        template<const bool _frozen_ips = frozen_ips>
-        typename std::enable_if<!_frozen_ips, bool>::type is_frozen() {
+        template<const bool compile_time = !is_null_or_empty(ip_list)>
+        typename std::enable_if<!compile_time, bool>::type is_frozen() {
             return frozen;
         }
 
         // Freezes the current list.
         // Any subsequent attempts to modify the list will be ignored.
-        template<const bool _frozen_ips = frozen_ips>
-        typename std::enable_if<!_frozen_ips, self_t&>::type freeze() {
+        template<const bool compile_time = !is_null_or_empty(ip_list)>
+        typename std::enable_if<!compile_time, self_t&>::type freeze() {
             assert(!frozen);
 
             if (frozen) {
@@ -716,17 +722,17 @@ namespace crow {
     // A Crow middleware that takes a whitelist of IPv4 addresses at compile time and blocks incomming requests from sources not in the whitelist.
     // Currently only IPv4 is supported.
     template<const char* allowed_ip_list>
-    using WhitelistIpGuard = remote_ip_guard_detail::RemoteIpGuard<allowed_ip_list, true, true>;
+    using WhitelistIpGuard = remote_ip_guard_detail::RemoteIpGuard<remote_ip_guard_detail::assert_not_null_or_empty<allowed_ip_list>(), true>;
 
     // A Crow middleware that builds a whitelist of IPv4 addresses at runtime and blocks incomming requests from sources not in the whitelist.
     // Currently only IPv4 is supported.
-    using DynamicWhitelistIpGuard = remote_ip_guard_detail::RemoteIpGuard<nullptr, true, false>;
+    using DynamicWhitelistIpGuard = remote_ip_guard_detail::RemoteIpGuard<nullptr, true>;
 
     // A Crow middleware that takes a blacklist of IPv4 addresses at compile time and blocks incomming requests from sources in the blacklist.
     // Currently only IPv4 is supported.
     template<const char* forbidden_ip_list>
-    using BlacklistIpGuard = remote_ip_guard_detail::RemoteIpGuard<forbidden_ip_list, false, true>;
+    using BlacklistIpGuard = remote_ip_guard_detail::RemoteIpGuard<remote_ip_guard_detail::assert_not_null_or_empty<forbidden_ip_list>(), false>;
 
     // A Crow middleware that builds a blacklist of IPv4 addresses at runtime and blocks incomming requests from sources in the blacklist.
-    using DynamicBlacklistIpGuard = remote_ip_guard_detail::RemoteIpGuard<nullptr, false, false>;
+    using DynamicBlacklistIpGuard = remote_ip_guard_detail::RemoteIpGuard<nullptr, false>;
 } // namespace crow
