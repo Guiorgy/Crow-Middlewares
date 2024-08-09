@@ -8,7 +8,7 @@ A set of useful middlewares for the [Crow microframework](https://github.com/Cro
 
 Alias of `RemoteIpGuard<allowed_ip_list, true>`.
 
-A middleware that checks if the IP an incomming request comes from is in a comma-separated whitelist, and returns result code 403 Forbidden if it is not.
+A middleware that checks if the IP an incoming request comes from is in a comma-separated whitelist, and returns result code 403 Forbidden if it is not.
 
 #### Usage
 
@@ -78,7 +78,7 @@ int main()
 
 Alias of `RemoteIpGuard<forbidden_ip_list, false>`.
 
-A middleware that checks if the IP an incomming request comes from is in a comma-separated blacklist, and returns result code 403 Forbidden if it is.
+A middleware that checks if the IP an incoming request comes from is in a comma-separated blacklist, and returns result code 403 Forbidden if it is.
 
 #### Usage
 
