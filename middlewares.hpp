@@ -178,6 +178,7 @@ namespace crow_middlewares_detail {
 
     // Counts the number of IPv4 addresses in a comma-separated list.
     // Returns -1 if the format is invalid, or count is greater than max_count.
+    // Note: This does not check if the list contains duplicates and counts them all.
     template<const bool unique = true, const std::size_t default_max_count = std::numeric_limits<std::size_t>::max()>
     constexpr std::size_t count_ips(const char* ips, const std::size_t max_count = default_max_count) noexcept {
         if (is_null_or_empty(ips)) return 0;
