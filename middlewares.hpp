@@ -159,6 +159,36 @@ namespace crow_middlewares_detail {
         return str == nullptr || *str == '\0';
     }
 
+    // Checks whether a valid IP address is IPv4 or IPv6 by checking:
+    //   - If the string starts with a double dot (::)
+    //   - First 4 characters contain a dot (*.** or **.* or ***.).
+    // Assumes that the input is not nullptr and a valid IPv4 or IPv6 address string.
+    // Note: If the input string is "::\0", the below algorithm will access an invalid byte past the null character.
+    // Based on https://graphics.stanford.edu/~seander/bithacks.html
+    constexpr inline int determine_address_family(const char* address) noexcept {
+        constexpr const uint32_t double_dot = (uint32_t)':';
+        const uint32_t first_byte = static_cast<const uint32_t>(*address);
+        const uint32_t does_not_start_with_double_dot = first_byte ^ double_dot;
+
+        constexpr const uint32_t dot = (uint32_t)'.';
+        constexpr const uint32_t dot_mask = dot | (dot << 8) | (dot << 16) | (dot << 24);
+        const uint32_t first_4_bytes = *(reinterpret_cast<const uint32_t*>(address));
+        const uint32_t masked = first_4_bytes ^ dot_mask;
+        const uint32_t contains_dot = ((masked) - 0x01010101UL) & ~(masked) & 0x80808080UL;
+
+        const bool is_ipv4 = does_not_start_with_double_dot & contains_dot;
+
+        return is_ipv4 ? AF_INET : AF_INET6;
+    }
+
+    // An alternative to determine_address_family that doesn't go out of bounds when input is "::\0".
+    // Assumes that the input is not nullptr and a valid IPv4 or IPv6 address string.
+    constexpr inline int determine_address_family_safe(const char* address) noexcept {
+        const bool is_ipv4 = address[0] != ':' && (address[0] == '.' || address[1] == '.' || address[2] == '.' || address[3] == '.');
+
+        return is_ipv4 ? AF_INET : AF_INET6;
+    }
+
     // Checks if a string is valid IPv4 subnet (0-255).
     // Assumes that all characters are digits and the subnet char array is null-terminated.
     constexpr bool is_valid_subnet(const char* subnet) noexcept {
