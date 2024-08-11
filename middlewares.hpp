@@ -149,9 +149,9 @@ namespace crow_middlewares_detail {
 
     // The size threshold when searching in a container at which point binary search should be used instead of linear search.
     #ifdef CROW_MIDDLEWARES_BINARY_SEARCH_THRESHOLD
-    static const std::size_t binary_search_threshold = CROW_MIDDLEWARES_BINARY_SEARCH_THRESHOLD;
+    static constexpr std::size_t binary_search_threshold = CROW_MIDDLEWARES_BINARY_SEARCH_THRESHOLD;
     #else
-    static const std::size_t binary_search_threshold = 8;
+    static constexpr std::size_t binary_search_threshold = 8;
     #endif // CROW_MIDDLEWARES_BINARY_SEARCH_THRESHOLD
 
     // Checks if the null-terminated string is nullptr or empty.
@@ -496,8 +496,8 @@ namespace remote_ip_guard_detail {
 
             std::string str;
 
-            const std::size_t ip_max_size = 15; // ***.***.***.***
-            const std::size_t ip_list_separator = 2; // comma + space
+            constexpr std::size_t ip_max_size = 15; // ***.***.***.***
+            constexpr std::size_t ip_list_separator = 2; // comma + space
             str.reserve((ip_max_size + ip_list_separator) * ips.size());
 
             auto it = ips.begin();
