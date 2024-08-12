@@ -147,13 +147,6 @@ namespace crow_middlewares_detail {
     };
 #endif // __cplusplus >= 202002L // c++20
 
-    // The size threshold when searching in a container at which point binary search should be used instead of linear search.
-    #ifdef CROW_MIDDLEWARES_BINARY_SEARCH_THRESHOLD
-    static constexpr std::size_t binary_search_threshold = CROW_MIDDLEWARES_BINARY_SEARCH_THRESHOLD;
-    #else
-    static constexpr std::size_t binary_search_threshold = 8;
-    #endif // CROW_MIDDLEWARES_BINARY_SEARCH_THRESHOLD
-
     // Checks if the null-terminated string is nullptr or empty.
     constexpr bool is_null_or_empty(const char* str) {
         return str == nullptr || *str == '\0';
@@ -308,6 +301,41 @@ namespace crow_middlewares_detail {
         }
 
         return false;
+    }
+
+#ifndef CROW_MIDDLEWARES_BINARY_SEARCH_THRESHOLD
+#define CROW_MIDDLEWARES_BINARY_SEARCH_THRESHOLD 11
+#endif
+
+    // The container size threshold at which point binary search should be used instead of linear search when searching for an element.
+    static constexpr std::size_t binary_search_threshold = CROW_MIDDLEWARES_BINARY_SEARCH_THRESHOLD;
+
+    // Checks whether a sorted std::vector contains a value.
+    // If most_likely_missing is set to true, the bounds will be checked first to optimize for missing elements.
+    // If assume_size is set to something other than -1, that value will be used in deciding whether to use binary search at compile time.
+    template<typename T, const bool most_likely_missing = true, const std::size_t assume_size = static_cast<std::size_t>(-1)>
+    constexpr inline bool sorted_vector_contains(const std::vector<T>& vector, const T& value) noexcept {
+        std::size_t size = assume_size != static_cast<std::size_t>(-1) ? assume_size : vector.size();
+
+        if (size <= binary_search_threshold) {
+            if constexpr (most_likely_missing) {
+                if (vector.back() < value) return false;
+            }
+
+            const auto is_not_less_than_value = [value](const T& element) {
+                return value <= element;
+            };
+
+            auto it = std::find_if(vector.begin(), vector.end(), is_not_less_than_value);
+
+            return it != vector.end() && *it == value;
+        } else {
+            if constexpr (most_likely_missing) {
+                if (value < vector.front() || vector.back() < value) return false;
+            }
+
+            return std::binary_search(vector.begin(), vector.end(), value);
+        }
     }
 
     // Parses a string formatted as a comma-separated list of IPv4 addresses and returns a std::vector with their integer representations.
@@ -543,10 +571,14 @@ namespace remote_ip_guard_detail {
                 }
             }
 
-            const bool ip_set_contains =
-                ip_set.size() <= binary_search_threshold
-                    ? std::find(ip_set.begin(), ip_set.end(), ipv4) != ip_set.end()
-                    : std::binary_search(ip_set.begin(), ip_set.end(), ipv4);
+            bool ip_set_contains;
+
+            constexpr size_t compile_time_size = count_ips(ip_list);
+            if constexpr (compile_time_size != 0) {
+                ip_set_contains = sorted_vector_contains<int32_t, true, compile_time_size>(ip_set, ipv4);
+            } else {
+                ip_set_contains = sorted_vector_contains(ip_set, ipv4);
+            }
 
             if constexpr (whitelist) {
                 return ip_set_contains;
